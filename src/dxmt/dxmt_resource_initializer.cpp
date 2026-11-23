@@ -267,10 +267,14 @@ ResourceInitializer::initWithData(
   size_t texel_size = MTLGetTexelSize(texture->pixelFormat());
   size_t bytes_per_row_needed = texel_size * align(width_sub, block_size) / block_size;
   size_t bytes_per_row_increment = is_1d_tex ? bytes_per_row_needed : row_pitch;
-  size_t bytes_per_row_valid = is_1d_tex ? bytes_per_row_needed : std::min(row_pitch, bytes_per_row_needed);
+  // D3D11: SysMemPitch/SysMemSlicePitch are only the stride between rows/slices; every row is still
+  // width * bytes-per-texel long (and every slice bytes_per_image_needed long), even when the application
+  // passes a smaller pitch (common for single-row textures, e.g. Age of Empires II DE's 256x1 UI gradient ramps).
+  // Clamping the copy to the pitch left the rest of the row uninitialised.
+  size_t bytes_per_row_valid = bytes_per_row_needed;
   size_t bytes_per_image_needed = bytes_per_row_needed * align(height_sub, block_size) / block_size;
   size_t bytes_per_image_increment = is_3d_tex ? depth_pitch : bytes_per_image_needed;
-  size_t bytes_per_image_valid = is_3d_tex ? std::min(depth_pitch, bytes_per_image_needed) : bytes_per_image_needed;
+  size_t bytes_per_image_valid = bytes_per_image_needed;
   size_t total_bytes_needed = bytes_per_image_needed * depth_sub;
 
   std::lock_guard<dxmt::mutex> lock(mutex_);
